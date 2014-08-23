@@ -1,0 +1,22 @@
+
+[
+  {
+    "cmd": "cd print && ruby print.rb 12 600",
+    "name": "print-12-10m",
+    "groups": [
+      "json", "all"
+    ],
+    "colour": "cyan",
+	"notify": "NOTIFY|Error:|ERROR:|browser:"
+  },
+  {
+    "cmd": "cd print && ruby print.rb 15 60",
+    "name": "print-15-1m",
+    "groups": [
+      "json", "all"
+    ],
+    "colour": "yellow",
+	"notify": "NOTIFY|Error:|ERROR:|browser:"
+  }
+]
+
