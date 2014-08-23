@@ -83,9 +83,8 @@ class Runner
             message ||= raw_line
             puts Rainbow(name).color(:red).bright() + ":" + Rainbow(message).color(:red).bright()
         end
-        @notifiers = {
-            :osx => osx_notify,
-            :console => console_notify }.merge(config.notifiers)
+        std_notifiers = { :osx => osx_notify, :console => console_notify }
+        @notifiers = std_notifiers.merge(config.notifiers || {})
         run(active)
     end
 

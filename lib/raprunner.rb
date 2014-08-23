@@ -1,7 +1,9 @@
 require "raprunner/version"
 
-$: << './lib'
 
 module Raprunner
-  require 'raprunner/multiproc'
+    require 'raprunner/process'
+    require 'raprunner/loader'
+    require 'raprunner/multiproc'
+    require 'raprunner/config'
 end
