@@ -13,8 +13,12 @@ process  (500, 404, Exception... etc)
 
 While it's running you can hit return (or anything really..) to get the current status of the processes
 
+I tried doing this with Guard but couldn't see how to make it work smoothly with restarts etc. Foreman
+is also very similar (and works very well) but I needed to create 10 servers and 30 clients all with 
+slightly different configuration.  Hence, the config for RapRunner is a ruby script (like Guard) so
+that I could create many processes in a loop.
 
-## Installation
+## Installation ##
 
 Add this line to your application's Gemfile:
 
@@ -32,13 +36,12 @@ Or install it yourself as:
 
 Add the raprunner bin to your path, or find out where it's installed...
 
-### as a commandline tool ###
+### As a commandline tool ###
 
 Create a simple runner file
 
-	runner.rb
+In runner.rb place
 
-	#       name            commandline gets passed to the shell
 	command = "echo 'information' ; sleep 20 ; echo 'ERROR' ; sleep 20 ; echo 'DONE' " 
 	process("print-10-10m", command) do |p|
 		p.group('proc')     								# add this to the 'proc' group
@@ -51,7 +54,7 @@ Create a simple runner file
 		p.group('proc')
 		p.group('all')
 		p.colour = :green									# symbols or strings for colours
-		p.notify("NOTIFY")									# plain string notify
+		p.notify("500|NOTIFY")								# plain string notify 500 OR NOTIFY
 		p.dir = 'subdir'									# change to this dir before run
 		p.max_restarts = 3									# restart max 3 times. Default is 10
 	end
