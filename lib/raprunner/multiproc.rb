@@ -27,17 +27,20 @@ class ProcessInstance
         @config.command
     end
 
+    def backoff_seconds()
+        @config.backoff_seconds
+    end
+
     def max_restarts()
         @config.max_restarts || 10
     end
 
-    attr_accessor :restarts
+    attr_accessor :restarts, :last_exit_status
     attr_reader :pid
     attr_reader :start_time
 
     def call_notify(raw_line, name, matches)
         return unless @notifiers
-        puts "NOTIFY"
         @notifiers.each_pair do |k, n|
             n.call(raw_line, name, matches)
         end
@@ -47,7 +50,7 @@ class ProcessInstance
         cmd = @config.command
         name = @config.name
         colour = @config.colour
-        notify = @config.notifies.first  #  not supported multiple yet
+        notify = @config.notifies.first  if @config.notifies #  not supported multiple yet
         spawn_opts = @config.spawn_opts.clone()  # popen modifies this
         @start_time = DateTime.now()
         Open3.popen2e(cmd, spawn_opts) do |stdin, stream, thread|
@@ -59,9 +62,10 @@ class ProcessInstance
                     puts Rainbow(name).color(colour) + ":" + raw_line
                 end
             end
+            @last_exit_status = thread.value.exitstatus
         end
-        call_notify("Process [#{name}] exited", name, ["Exit:", "#{name} exited"])
-        # puts Rainbow(name).color(colour) + ":" + error( "Exited: #{cmd}" )
+        #onexit(name, @last_exit_status)
+        return @last_exit_status
     end
 
     attr_reader :config
@@ -88,6 +92,22 @@ class Runner
         run(active)
     end
 
+    def on_process_exit(name, exit_status, restart_time, restart, max_restarts)
+        msg_restart = restart >= max_restarts ? "Will not be restarted" : "Restart in #{restart_time} seconds"
+        if(exit_status == 0)
+            call_notify("Process [#{name}] exited", name, ["Exit:", "#{name} exited. #{msg_restart}"])
+        else
+            call_notify("Process [#{name}] failed", name, ["Fail:", "#{name} failed with status #{exit_status}. #{msg_restart} "])
+        end
+    end
+
+    def call_notify(raw_line, name, matches)
+        return unless @notifiers
+        @notifiers.each_pair do |k, n|
+            n.call(raw_line, name, matches)
+        end
+    end
+
     def run(active)
         processes = exec(active)
         wait_and_read(processes, STDIN)
@@ -97,27 +117,31 @@ class Runner
         Rainbow(text).red
     end
 
-    def run_background(process_config)
+    def run_process(pi, process_config)
+        loop do
+            exit_status = pi.run()
+            pi.restarts += 1
+            restart_time = exit_status == 0 ? 0 : pi.backoff_seconds ** pi.restarts
+            on_process_exit(process_config.name, exit_status, restart_time, pi.restarts, pi.max_restarts)
+            sleep(pi.backoff_seconds ** pi.restarts)
+            r = pi.restarts
+            m = pi.max_restarts
+            if(r < m)
+                puts "Restart [#{pi.restarts} of #{pi.max_restarts}]: #{process_config.name}"
+            else
+                puts "Not restarting [#{pi.restarts} of #{pi.max_restarts}]: #{process_config.name}"
+                break
+            end
+        end
+    rescue Exception => e
+        pp e
+        pp e.backtrace
+    end
+
+    def run_background_process(process_config)
         pi = ProcessInstance.new(process_config, @notifiers)
         thread = Thread.new do
-            begin
-            loop do
-                pi.run()
-                sleep(pi.restarts ** 3)
-                pi.restarts += 1
-                r = pi.restarts
-                m = pi.max_restarts
-                if(r < m)
-                    puts "Restart [#{pi.restarts} of #{pi.max_restarts}]: #{process_config.name}"
-                else
-                    puts "Not restarting [#{pi.restarts} of #{pi.max_restarts}]: #{process_config.name}"
-                    break
-                end
-            end
-            rescue Exception => e
-                pp e
-                pp e.backtrace
-            end
+            run_process(pi, process_config)
         end
         return thread, pi
     end
@@ -137,10 +161,9 @@ class Runner
     def exec(commands)
         threads = {}
         commands.each do |c|
-            notify = c.notifies.first
             cname = Rainbow(c.name).color(c.colour)
-            puts("Running [#{c.command}] as [#{cname}]. Notify on #{notify}")
-            thread,pi = run_background(c)
+            puts("Running [#{c.command}] as [#{cname}]. Notify on #{c.notifies}")
+            thread,pi = run_background_process(c)
             raise("Failed to run [#{c.name}] -> #{c.command}") unless thread.alive?
             threads[thread] = pi
         end

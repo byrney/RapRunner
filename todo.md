@@ -11,6 +11,17 @@
 - [ ] Add commands to the console window to stop/start etc processes
 - [ ] Give processes a time window to be running and start/stop them as require
 - [ ] win32 service version so the runner itself keeps running
+- [ ] Daemonize option on unix
 - [ ] Save process state to disk so that we can find them again when we restart
 - [ ] command to re-read the config files and insert new proceses (maybe disabled)
-
+- [ ] Redirection to logfiles
+- [ ] Start a single process instead of a group
+                Raprunner –p web-0 procfile.rb
+- [ ] Minimum runtime to change backoff logic
+         Process(…,..) do |p|
+             p.minRuntime = 30
+if p lasts for 30 seconds or more then restart immediately.
+- [x] Immediate restart if successful exit code
+- [ ] Colour sequence as default if no colours specified
+- [ ] Properties at group level get inherited by processes in the group?
+- [ ] Show status or process rather than thread  (esp when waiting to restart)

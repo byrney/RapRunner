@@ -1,6 +1,31 @@
 #!/usr/bin/env ruby
 require 'raprunner'
-location = ARGV[0]
-group = ARGV[1]
+require 'optparse'
+
+options = Struct.new(:config, :group, :notifiers).new
+
+OptionParser.new() do |opt|
+    opt.banner = "Usage: #{File.basename($0)} [OPTIONS] CONFIG GROUP"
+    opt.on('-c', '--config CONFIG', String, "File or directory of configuration") do |arg|
+        options.config = arg
+    end
+    opt.on('-g', '--group GROUP', String, "Group name to start") do |arg|
+        options.group = arg
+    end
+    opt.on('-n', '--notifiers CONFIG', String, "Config for notifiers") do |arg|
+        options.notifiers = arg
+    end
+    opt.on('-h', '--help' , "Show this help") do |arg|
+        puts opt.help()
+        exit()
+    end
+    #opt.tail("Options will override arguments")
+end.parse!
+
+location = options.config || ARGV[0]
+group = options.group || ARGV[1]
+raise("No configuration specified") unless location
+raise("No group specified") unless group
+
 loader = Loader.new(location)
 Runner.new(loader.config, group)

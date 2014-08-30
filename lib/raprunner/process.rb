@@ -17,6 +17,7 @@ class ProcessConfig
         @colour = :white
         @spawn_opts = {}
         @restarts = 1
+        @backoff_seconds = 2
     end
 
     def to_s()
@@ -51,6 +52,6 @@ class ProcessConfig
 
     attr_reader :colour
 
-    attr_accessor :groups, :notifies, :directory, :name, :command, :notifier, :spawn_opts, :max_restarts
+    attr_accessor :groups, :backoff_seconds, :notifies, :directory, :name, :command, :notifier, :spawn_opts, :max_restarts
 
 end
