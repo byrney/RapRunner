@@ -50,7 +50,6 @@ class Configuration
 
     def load(filename)
         content = File.read(filename)
-        puts "loading #{filename}"
         run(content)
     end
 
@@ -62,13 +61,12 @@ class Configuration
         @processes.concat(Array(cfg.processes))
         if(cfg.notifiers)
             @notifiers.merge!(cfg.notifiers) {|key, oldv, newv| puts "Warning: replacing notifier #{key}" ; newv}
-            pp @notifiers
         end
     end
 
     def to_s()
         s = '['
-        @cfg.processes.each do |p|
+        @processes && @processes.each do |p|
             s+= p.to_s
         end
         s += ']'

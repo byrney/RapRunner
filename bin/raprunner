@@ -1,8 +1,9 @@
 #!/usr/bin/env ruby
 require 'raprunner'
 require 'optparse'
+require 'pp'
 
-options = Struct.new(:config, :group, :notifiers).new
+options = Struct.new(:config, :group, :notifiers, :process_name, :dryrun).new
 
 OptionParser.new() do |opt|
     opt.banner = "Usage: #{File.basename($0)} [OPTIONS] CONFIG GROUP"
@@ -12,8 +13,11 @@ OptionParser.new() do |opt|
     opt.on('-g', '--group GROUP', String, "Group name to start") do |arg|
         options.group = arg
     end
-    opt.on('-n', '--notifiers CONFIG', String, "Config for notifiers") do |arg|
-        options.notifiers = arg
+    opt.on('-p', '--process NAME', String, "Process name to start") do |arg|
+        options.process_name = arg
+    end
+    opt.on('-n', '--dry-run', "Dry Run. Just dump the config") do |arg|
+        options.dryrun = true
     end
     opt.on('-h', '--help' , "Show this help") do |arg|
         puts opt.help()
@@ -25,7 +29,11 @@ end.parse!
 location = options.config || ARGV[0]
 group = options.group || ARGV[1]
 raise("No configuration specified") unless location
-raise("No group specified") unless group
+raise("Nothing to run. Either --group or --process require") unless group || options.process_name
 
 loader = Loader.new(location)
-Runner.new(loader.config, group)
+if(options.dryrun)
+    pp loader.config
+else
+    Runner.new(loader.config, group, options.process_name)
+end

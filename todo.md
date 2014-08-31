@@ -15,12 +15,8 @@
 - [ ] Save process state to disk so that we can find them again when we restart
 - [ ] command to re-read the config files and insert new proceses (maybe disabled)
 - [ ] Redirection to logfiles
-- [ ] Start a single process instead of a group
+- [x] Start a single process instead of a group
                 Raprunner –p web-0 procfile.rb
-- [ ] Minimum runtime to change backoff logic
-         Process(…,..) do |p|
-             p.minRuntime = 30
-if p lasts for 30 seconds or more then restart immediately.
 - [x] Immediate restart if successful exit code
 - [ ] Colour sequence as default if no colours specified
 - [ ] Properties at group level get inherited by processes in the group?

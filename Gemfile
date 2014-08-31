@@ -4,7 +4,11 @@ source 'https://rubygems.org'
 gemspec
 
 gem 'rainbow'
-gem 'pry'
-gem 'terminal-notifier'
+
+group :test do
+    gem 'pry'
+    gem 'terminal-notifier'
+    gem 'eventmachine'
+end
 
 

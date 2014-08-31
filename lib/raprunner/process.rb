@@ -16,7 +16,7 @@ class ProcessConfig
         @command = command
         @colour = :white
         @spawn_opts = {}
-        @restarts = 1
+        @max_restarts = 1
         @backoff_seconds = 2
     end
 
@@ -46,6 +46,7 @@ class ProcessConfig
     end
 
     def dir=(d)
+        raise('Not a directory #{d}') unless File.directory?(d)
         @spawn_opts ||= {}
         @spawn_opts[:chdir] = d
     end

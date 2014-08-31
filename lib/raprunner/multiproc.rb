@@ -73,9 +73,14 @@ end
 
 class Runner
 
-    def initialize(config, group)
-        puts "Starting group [#{group}]"
-        active = config.processes.select{|h| h.groups.include?(group)}
+    def initialize(config, group, name)
+        if(name)
+            puts "Starting process [#{name}]"
+            active = config.processes.select{|h| h.name == name}
+        else
+            puts "Starting group [#{group}]"
+            active = config.processes.select{|h| h.groups.include?(group)}
+        end
         raise("Nothing to run in group [#{group}]") unless active.length > 0
         osx_notify = lambda do |raw_line, name, matches|
             message = matches[1]
