@@ -2,5 +2,5 @@
 require 'raprunner'
 require 'raprunner/commandline'
 
-RapRunner.Run()
+RapRunner.Start(ARGV)
 

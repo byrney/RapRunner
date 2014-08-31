@@ -4,7 +4,7 @@ require 'pp'
 
 module RapRunner
 
-    def self.Run()
+    def self.Parse(argv)
 
         options = Struct.new(:config, :group, :notifiers, :process_name, :dryrun).new
 
@@ -29,7 +29,7 @@ module RapRunner
             #opt.tail("Options will override arguments")
         end
 
-        parser.parse!()
+        parser.parse!(argv)
 
         def usage(parser, message)
             puts message
@@ -37,16 +37,21 @@ module RapRunner
             exit 1
         end
 
-        location = options.config || ARGV[0]
-        group = options.group || ARGV[1]
-        usage(parser, "Must specify a configuration with --config") unless location
-        usage(parser, "Nothing to run. Either --group or --process require") unless group || options.process_name
+        # these for backward compatability
+        options.config ||= argv[0]
+        options.group ||= argv[1]
+        usage(parser, "Must specify a configuration with --config") unless options.config
+        usage(parser, "Nothing to run. Either --group or --process require") unless options.group || options.process_name
+        return options
+    end
 
-        loader = RapRunner::Loader.new(location)
+    def self.Start(argv)
+        options = self.Parse(argv)
+        loader = RapRunner::Loader.new(options.config)
         if(options.dryrun)
             pp loader.config
         else
-            RapRunner::Runner.new(loader.config, group, options.process_name)
+            RapRunner::Runner.new(loader.config, options.group, options.process_name)
         end
     end
 end
