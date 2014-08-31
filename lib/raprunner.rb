@@ -1,9 +1,5 @@
 require "raprunner/version"
-
-
-module Raprunner
-    require 'raprunner/process'
-    require 'raprunner/loader'
-    require 'raprunner/multiproc'
-    require 'raprunner/config'
-end
+require 'raprunner/process_config'
+require 'raprunner/loader'
+require 'raprunner/runner'
+require 'raprunner/config'

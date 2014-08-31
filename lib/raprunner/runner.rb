@@ -10,6 +10,8 @@ require 'date'
 require 'raprunner/config'
 require 'raprunner/loader'
 
+module RapRunner
+
 class ProcessInstance
     def initialize(config, notifiers)
         @config = config
@@ -202,10 +204,11 @@ class Runner
 
 end
 
+end
 if __FILE__ == $0
     location = ARGV[0]
     group = ARGV[1]
-    loader = Loader.new(location)
-    Runner.new(loader.config, group, nil)
+    loader = RapRunner.Loader.new(location)
+    RapRunner.Runner.new(loader.config, group, nil)
 end
 
