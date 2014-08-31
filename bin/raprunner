@@ -5,7 +5,7 @@ require 'pp'
 
 options = Struct.new(:config, :group, :notifiers, :process_name, :dryrun).new
 
-OptionParser.new() do |opt|
+parser = OptionParser.new() do |opt|
     opt.banner = "Usage: #{File.basename($0)} [OPTIONS] CONFIG GROUP"
     opt.on('-c', '--config CONFIG', String, "File or directory of configuration") do |arg|
         options.config = arg
@@ -21,15 +21,23 @@ OptionParser.new() do |opt|
     end
     opt.on('-h', '--help' , "Show this help") do |arg|
         puts opt.help()
-        exit()
+        exit(0)
     end
     #opt.tail("Options will override arguments")
-end.parse!
+end
+
+parser.parse!()
+
+def usage(parser, message)
+    puts message
+    puts parser.help()
+    exit 1
+end
 
 location = options.config || ARGV[0]
 group = options.group || ARGV[1]
-raise("No configuration specified") unless location
-raise("Nothing to run. Either --group or --process require") unless group || options.process_name
+usage(parser, "Must specify a configuration with --config") unless location
+usage(parser, "Nothing to run. Either --group or --process require") unless group || options.process_name
 
 loader = Loader.new(location)
 if(options.dryrun)

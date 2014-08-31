@@ -35,8 +35,8 @@ class ProcessInstance
         @config.max_restarts || 10
     end
 
-    attr_accessor :restarts, :last_exit_status
-    attr_reader :pid
+    attr_accessor :restarts
+    attr_reader :pid, :last_exit_status
     attr_reader :start_time
 
     def call_notify(raw_line, name, matches)
@@ -206,6 +206,6 @@ if __FILE__ == $0
     location = ARGV[0]
     group = ARGV[1]
     loader = Loader.new(location)
-    Runner.new(loader.config, group)
+    Runner.new(loader.config, group, nil)
 end
 
