@@ -31,3 +31,10 @@ process "exit throws 2", "ruby throw_after.rb 2" do |p|
     p.backoff_seconds = 1
     p.colour = :magenta
 end
+
+process "write-stderr", "ruby write_stderr.rb" do |p|
+    p.group('all')
+    p.max_restarts = 2
+    p.backoff_seconds = 1
+    p.colour = :yellow
+end
