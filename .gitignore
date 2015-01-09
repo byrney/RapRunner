@@ -16,4 +16,5 @@ test/tmp
 test/version_tmp
 tmp
 Icon
+.DS_Store
 
