@@ -5,38 +5,46 @@ require 'pry'
 require 'terminal-notifier'
 require 'date'
 require 'open3'
+require 'socket'
 require 'raprunner/config'
 require 'raprunner/loader'
 require 'raprunner/color'
 require 'raprunner/instance'
+require 'raprunner/monitor'
 
 module RapRunner
 
     class Runner
 
-        def initialize(config, group, name)
+        def initialize(config, group, name, server)
+            @monitors = []
+            @monitors << STDOUT unless server
             if(name)
-                puts "Starting process [#{name}]"
+                monitor( "Starting process [#{name}]")
                 active = config.processes.select{|h| h.name == name}
             else
-                puts "Starting group [#{group}]"
+                monitor( "Starting group [#{group}]")
                 active = config.processes.select{|h| h.groups.include?(group)}
             end
             raise("Nothing to run in group [#{group}]") unless active.length > 0
             @notifiers = std_notifiers().merge(config.notifiers || {})
-            run(active)
+            run(active, server)
         end
 
-        def run(active)
+        def run(active, server)
             @processes = exec(active)
-            wait_and_read(@processes, [STDIN])
+            if(server)
+                wait_server(@processes)
+            else
+                wait_and_read(@processes, [STDIN])
+            end
         end
 
         def exec(commands)
             threads = {}
             commands.each do |c|
                 cname = Color.send(c.colour, c.name)
-                puts("Running [#{c.command}] as [#{cname}]. Notify on #{c.notifies}")
+                monitor(("Running [#{c.command}] as [#{cname}]. Notify on #{c.notifies}"))
                 thread,pi = run_background_process(c)
                 raise("Failed to run [#{c.name}] -> #{c.command}") unless thread.alive?
                 threads[thread] = pi
@@ -62,9 +70,9 @@ module RapRunner
                 r = pi.restarts
                 m = pi.max_restarts
                 if(r < m)
-                    puts "Restart [#{pi.restarts} of #{pi.max_restarts}]: #{process_config.name}"
+                    monitor("Restart [#{pi.restarts} of #{pi.max_restarts}]: #{process_config.name}")
                 else
-                    puts "Not restarting [#{pi.restarts} of #{pi.max_restarts}]: #{process_config.name}"
+                    monitor("Not restarting [#{pi.restarts} of #{pi.max_restarts}]: #{process_config.name}")
                     break
                 end
             end
@@ -73,30 +81,60 @@ module RapRunner
             pp e.backtrace
         end
 
+        def summary(processes)
+            body = []
+            body << sprintf("%s%s%s", '=' * 30, '  status   ', '=' * 30)
+            format = "%-10s%-15s%-20s%-20s%-30s"
+            body << sprintf(format, 'pid', 'name', 'status', 'start', 'command')
+            processes.each_pair do |thread, pi|
+                st = pi.start_time.strftime("%T") if pi.start_time
+                body << sprintf(format,  pi.pid, pi.name, colour_status(thread), st, pi.command)
+            end
+            body << sprintf("%s\n", '=' * 70)
+            return  body.join("\n");
+        end
+
         def wait_and_read(processes, input_ios)
             process_threads = processes.keys()
             while(process_threads.any? {|t| t.alive?})
                 rs,_,_ = IO.select(input_ios, nil, nil, 5)
                 if(rs)
                     rs.first.readline
-                    printf("%s%s%s\n", '=' * 30, '  status   ', '=' * 30)
-                    format = "%-10s%-15s%-20s%-20s%-30s\n"
-                    printf(format, 'pid', 'name', 'status', 'start', 'command')
-                    processes.each_pair do |thread, pi|
-                        st = pi.start_time.strftime("%T") if pi.start_time
-                        printf(format,  pi.pid, pi.name, colour_status(thread), st, pi.command)
-                    end
-                    printf("%s\n", '=' * 70)
+                    puts summary(processes)
                 end
             end
         rescue EOFError
-            puts "Bye"
+            monitor("Bye")
+        end
+
+        def wait_server(processes)
+            port = 2000
+            puts("Accepting monitor connections on #{port}")
+            server = TCPServer.new("127.0.0.1", port)
+            loop {
+                client = server.accept()
+                @monitors << Monitor.new(client)
+                client.write("RapRunner: Connected\n")
+            }
+        end
+
+        def monitor(message)
+            current_monitors = Array.new(@monitors)
+            current_monitors.each do |m|
+                begin
+                    m.write(message)
+                rescue IOError => e
+                    pp e
+                    client = @monitors.delete(m)
+                    client.close()
+                end
+            end
         end
 
         def log(process_name, output)
             pi = @processes.find { |k,v| v.name == process_name }[1]
-            colour = pi.colour
-            puts Color.send(colour, process_name) + ":" + output
+            msg = Color.send(pi.colour, process_name) + ":" + output
+            monitor(msg)
         end
 
         def std_notifiers()

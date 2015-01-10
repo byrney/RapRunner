@@ -6,7 +6,7 @@ module RapRunner
 
     def self.Parse(argv)
 
-        options = Struct.new(:config, :group, :notifiers, :process_name, :dryrun).new
+        options = Struct.new(:config, :group, :notifiers, :process_name, :dryrun, :server).new
 
         parser = OptionParser.new() do |opt|
             opt.banner = "Usage: #{File.basename($0)} [OPTIONS] CONFIG GROUP"
@@ -21,6 +21,9 @@ module RapRunner
             end
             opt.on('-n', '--dry-run', "Dry Run. Just dump the config") do |arg|
                 options.dryrun = true
+            end
+            opt.on('-s', '--server', "Run as TCP server") do |arg|
+                options.server = true
             end
             opt.on('-h', '--help' , "Show this help") do |arg|
                 puts opt.help()
@@ -51,7 +54,7 @@ module RapRunner
         if(options.dryrun)
             pp loader.config
         else
-            RapRunner::Runner.new(loader.config, options.group, options.process_name)
+            RapRunner::Runner.new(loader.config, options.group, options.process_name, options.server)
         end
     end
 end
