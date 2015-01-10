@@ -3,8 +3,8 @@
 - [ ] Add some stuff to the readme
 - [ ] add remote control interface  (HTTP?)
 - [ ] Add restart count to the status messages
-- [ ] Github
-- [ ] rubygems?
+- [x] Github
+- [x] rubygems?
 - [ ] move the terminal notifier dependency out so it's optional  (or detect if installed?)
 - [ ] some tests would be nice...
 - [ ] Currently only uses the first notify rule for a given process
@@ -21,3 +21,4 @@
 - [ ] Colour sequence as default if no colours specified
 - [ ] Properties at group level get inherited by processes in the group?
 - [ ] Show status or process rather than thread  (esp when waiting to restart)
+- [ ] Notifier on windows  ( https://github.com/stereobooster/rb-notifu ? )

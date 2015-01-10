@@ -84,19 +84,27 @@ class Runner
             active = config.processes.select{|h| h.groups.include?(group)}
         end
         raise("Nothing to run in group [#{group}]") unless active.length > 0
-        osx_notify = lambda do |raw_line, name, matches|
-            message = matches[1]
-            message ||= raw_line
-            TerminalNotifier.notify(message, :title => name, :subtitle => matches[0], :group => name)
+        @notifiers = std_notifiers().merge(config.notifiers || {})
+        run(active)
+    end
+
+    def std_notifiers()
+        notifiers = {}
+        if(TerminalNotifier.available?)
+            osx_notify = lambda do |raw_line, name, matches|
+                message = matches[1]
+                message ||= raw_line
+                TerminalNotifier.notify(message, :title => name, :subtitle => matches[0], :group => name)
+            end
+            notifiers[:osx] = osx_notify
         end
         console_notify = lambda do |raw_line, name, matches|
             message = matches[1]
             message ||= raw_line
             puts Rainbow(name).color(:red).bright() + ":" + Rainbow(message).color(:red).bright()
         end
-        std_notifiers = { :osx => osx_notify, :console => console_notify }
-        @notifiers = std_notifiers.merge(config.notifiers || {})
-        run(active)
+        notifiers[:console] = console_notify
+        return notifiers
     end
 
     def on_process_exit(name, exit_status, restart_time, restart, max_restarts)
