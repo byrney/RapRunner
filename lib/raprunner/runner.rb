@@ -20,10 +20,10 @@ module RapRunner
             @monitors = []
             @monitors << STDOUT unless server
             if(name)
-                monitor( "Starting process [#{name}]")
+                notice( "Starting process [#{name}]")
                 active = config.processes.select{|h| h.name == name}
             else
-                monitor( "Starting group [#{group}]")
+                notice( "Starting group [#{group}]")
                 active = config.processes.select{|h| h.groups.include?(group)}
             end
             raise("Nothing to run in group [#{group}]") unless active.length > 0
@@ -34,7 +34,7 @@ module RapRunner
         def run(active, server)
             @processes = exec(active)
             if(server)
-                wait_server(@processes)
+                wait_server(@processes, [STDIN])
             else
                 wait_and_read(@processes, [STDIN])
             end
@@ -44,7 +44,7 @@ module RapRunner
             threads = {}
             commands.each do |c|
                 cname = Color.send(c.colour, c.name)
-                monitor(("Running [#{c.command}] as [#{cname}]. Notify on #{c.notifies}"))
+                notice(("Running [#{c.command}] as [#{cname}]. Notify on #{c.notifies}"))
                 thread,pi = run_background_process(c)
                 raise("Failed to run [#{c.name}] -> #{c.command}") unless thread.alive?
                 threads[thread] = pi
@@ -70,9 +70,9 @@ module RapRunner
                 r = pi.restarts
                 m = pi.max_restarts
                 if(r < m)
-                    monitor("Restart [#{pi.restarts} of #{pi.max_restarts}]: #{process_config.name}")
+                    notice("Restart [#{pi.restarts} of #{pi.max_restarts}]: #{process_config.name}")
                 else
-                    monitor("Not restarting [#{pi.restarts} of #{pi.max_restarts}]: #{process_config.name}")
+                    notice("Not restarting [#{pi.restarts} of #{pi.max_restarts}]: #{process_config.name}")
                     break
                 end
             end
@@ -107,15 +107,20 @@ module RapRunner
             monitor("Bye")
         end
 
-        def wait_server(processes)
-            port = 2000
-            puts("Accepting monitor connections on #{port}")
-            server = TCPServer.new("127.0.0.1", port)
+        def server_accept(server)
             loop {
                 client = server.accept()
                 @monitors << Monitor.new(client)
                 client.write("RapRunner: Connected\n")
             }
+        end
+
+        def wait_server(processes, ios)
+            port = 2000
+            puts("Accepting monitor connections on #{port}")
+            server = TCPServer.new("127.0.0.1", port)
+            Thread.new { server_accept(server) }
+            wait_and_read(processes, ios)
         end
 
         def monitor(message)
@@ -131,6 +136,10 @@ module RapRunner
             end
         end
 
+        def notice(message)
+            puts message
+            monitor(message)
+        end
         def log(process_name, output)
             pi = @processes.find { |k,v| v.name == process_name }[1]
             msg = Color.send(pi.colour, process_name) + ":" + output
