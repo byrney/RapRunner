@@ -2,13 +2,13 @@
 
 $: << "."
 require 'open3'
-require 'rainbow'
 require 'json'
 require 'pry'
 require 'terminal-notifier'
 require 'date'
 require 'raprunner/config'
 require 'raprunner/loader'
+require 'raprunner/color'
 
 module RapRunner
 
@@ -61,7 +61,7 @@ class ProcessInstance
                 if(raw_line.rstrip.length > 0)
                     match = notify && raw_line.match(notify)
                     match && call_notify(raw_line, name, match)
-                    puts Rainbow(name).color(colour) + ":" + raw_line
+                    puts Color.send(colour, name) + ":" + raw_line
                 end
             end
             @last_exit_status = thread.value.exitstatus
@@ -101,7 +101,7 @@ class Runner
         console_notify = lambda do |raw_line, name, matches|
             message = matches[1]
             message ||= raw_line
-            puts Rainbow(name).color(:red).bright() + ":" + Rainbow(message).color(:red).bright()
+            puts Color.red(name) + ":" + Color.red(message)
         end
         notifiers[:console] = console_notify
         return notifiers
@@ -129,7 +129,7 @@ class Runner
     end
 
     def error(text)
-        Rainbow(text).red
+        Color.red(text)
     end
 
     def run_process(pi, process_config)
@@ -165,18 +165,18 @@ class Runner
         status= thread.status
         case(status)
         when 'sleep'
-            Rainbow('running').color(:green)
+            Color.green('running')
         when false
-            Rainbow('finished').color(:red)
+            Color.red('finished')
         when nil
-            Rainbow('exception').color(:red)
+            Color.red('exception')
         end
     end
 
     def exec(commands)
         threads = {}
         commands.each do |c|
-            cname = Rainbow(c.name).color(c.colour)
+            cname = Color.send(c.colour, c.name)
             puts("Running [#{c.command}] as [#{cname}]. Notify on #{c.notifies}")
             thread,pi = run_background_process(c)
             raise("Failed to run [#{c.name}] -> #{c.command}") unless thread.alive?
