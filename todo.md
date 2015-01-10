@@ -5,7 +5,7 @@
 - [ ] Add restart count to the status messages
 - [x] Github
 - [x] rubygems?
-- [ ] move the terminal notifier dependency out so it's optional  (or detect if installed?)
+- [x] move the terminal notifier dependency out so it's optional  (or detect if installed?)
 - [ ] some tests would be nice...
 - [ ] Currently only uses the first notify rule for a given process
 - [ ] Add commands to the console window to stop/start etc processes
@@ -22,3 +22,4 @@
 - [ ] Properties at group level get inherited by processes in the group?
 - [ ] Show status or process rather than thread  (esp when waiting to restart)
 - [ ] Notifier on windows  ( https://github.com/stereobooster/rb-notifu ? )
+- [x] Make ansi colour work on windows
