@@ -1,12 +1,14 @@
 module RapRunner
 
     class ProcessInstance
-        def initialize(config, notifiers)
+        def initialize(config, notifiers, output_logger)
             @config = config
             @pid = nil
             @restarts = 0
             @start_time  = nil
             @notifiers = notifiers
+            @output_logger = output_logger
+            @colour = config.colour
         end
 
         def name()
@@ -27,7 +29,7 @@ module RapRunner
 
         attr_accessor :restarts
         attr_reader :pid, :last_exit_status
-        attr_reader :start_time
+        attr_reader :start_time, :colour
 
         def call_notify(raw_line, name, matches)
             return unless @notifiers
@@ -39,7 +41,6 @@ module RapRunner
         def run()
             cmd = @config.command
             name = @config.name
-            colour = @config.colour
             notify = @config.notifies.first  if @config.notifies #  not supported multiple yet
             spawn_opts = @config.spawn_opts.clone()  # popen modifies this
             @start_time = DateTime.now()
@@ -49,7 +50,7 @@ module RapRunner
                     if(raw_line.rstrip.length > 0)
                         match = notify && raw_line.match(notify)
                         match && call_notify(raw_line, name, match)
-                        puts Color.send(colour, name) + ":" + raw_line
+                        @output_logger.log(name, raw_line)
                     end
                 end
                 @last_exit_status = thread.value.exitstatus

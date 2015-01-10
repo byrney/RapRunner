@@ -28,8 +28,8 @@ module RapRunner
         end
 
         def run(active)
-            processes = exec(active)
-            wait_and_read(processes, STDIN)
+            @processes = exec(active)
+            wait_and_read(@processes, [STDIN])
         end
 
         def exec(commands)
@@ -45,7 +45,7 @@ module RapRunner
         end
 
         def run_background_process(process_config)
-            pi = ProcessInstance.new(process_config, @notifiers)
+            pi = ProcessInstance.new(process_config, @notifiers, self)
             thread = Thread.new do
                 run_process(pi, process_config)
             end
@@ -73,10 +73,10 @@ module RapRunner
             pp e.backtrace
         end
 
-        def wait_and_read(processes, input_io)
+        def wait_and_read(processes, input_ios)
             process_threads = processes.keys()
             while(process_threads.any? {|t| t.alive?})
-                rs,_,_ = IO.select([input_io], nil, nil, 5)
+                rs,_,_ = IO.select(input_ios, nil, nil, 5)
                 if(rs)
                     rs.first.readline
                     printf("%s%s%s\n", '=' * 30, '  status   ', '=' * 30)
@@ -91,6 +91,12 @@ module RapRunner
             end
         rescue EOFError
             puts "Bye"
+        end
+
+        def log(process_name, output)
+            pi = @processes.find { |k,v| v.name == process_name }[1]
+            colour = pi.colour
+            puts Color.send(colour, process_name) + ":" + output
         end
 
         def std_notifiers()
