@@ -17,8 +17,10 @@ module RapRunner
     class Runner
 
         def initialize(config, group, name, server)
+            @config = config
+            conmon = Monitor.new(STDOUT, server)  # mute stdout if running as server
             @monitors = []
-            @monitors << STDOUT unless server
+            @monitors << conmon
             if(name)
                 notice( "Starting process [#{name}]")
                 active = config.processes.select{|h| h.name == name}
@@ -81,32 +83,6 @@ module RapRunner
             pp e.backtrace
         end
 
-        def summary(processes)
-            body = []
-            body << sprintf("%s%s%s", '=' * 30, '  status   ', '=' * 30)
-            format = "%-10s%-15s%-20s%-20s%-30s"
-            body << sprintf(format, 'pid', 'name', 'status', 'start', 'command')
-            processes.each_pair do |thread, pi|
-                st = pi.start_time.strftime("%T") if pi.start_time
-                body << sprintf(format,  pi.pid, pi.name, colour_status(thread), st, pi.command)
-            end
-            body << sprintf("%s\n", '=' * 70)
-            return  body.join("\n");
-        end
-
-        def wait_and_read(processes, input_ios)
-            process_threads = processes.keys()
-            while(process_threads.any? {|t| t.alive?})
-                rs,_,_ = IO.select(input_ios, nil, nil, 5)
-                if(rs)
-                    rs.first.readline
-                    puts summary(processes)
-                end
-            end
-        rescue EOFError
-            monitor("Bye")
-        end
-
         def server_accept(server)
             loop {
                 client = server.accept()
@@ -123,15 +99,58 @@ module RapRunner
             wait_and_read(processes, ios)
         end
 
+        def wait_and_read(processes, input_ios)
+            process_threads = processes.keys()
+            while(process_threads.any? {|t| t.alive?})
+                rs,_,_ = IO.select(input_ios, nil, nil, 5)
+                if(rs)
+                    rs.each do |r|
+                        line = r.readline()
+                        control_command(r, line, processes)
+                    end
+                end
+            end
+        rescue EOFError
+            monitor("Bye")
+        end
+
+        def control_command(requestio, line, processes)
+            respio = (requestio == STDIN) ? STDOUT : requestio
+            @monitors.each { |m| m.io == respio && m.mute = true }
+            case line.strip()
+            when "status"
+                respio.write( summary(processes) )
+            when "mon"
+                @monitors.each { |m| m.io == respio && m.mute = false }
+            when ""
+
+            else
+                respio.write("Unknown command #{line}");
+            end
+        end
+
+        def summary(processes)
+            body = []
+            body << sprintf("%s%s%s", '=' * 30, '  status   ', '=' * 30)
+            format = "%-10s%-15s%-20s%-20s%-30s"
+            body << sprintf(format, 'pid', 'name', 'status', 'start', 'command')
+            processes.each_pair do |thread, pi|
+                st = pi.start_time.strftime("%T") if pi.start_time
+                body << sprintf(format,  pi.pid, pi.name, colour_status(thread), st, pi.command)
+            end
+            body << sprintf("%s\n", '=' * 70)
+            return  body.join("\n");
+        end
+
         def monitor(message)
             current_monitors = Array.new(@monitors)
             current_monitors.each do |m|
                 begin
                     m.write(message)
-                rescue IOError => e
+                rescue Exception, Errno::ECONNRESET => e
                     pp e
                     client = @monitors.delete(m)
-                    client.close()
+                    client.close() if client
                 end
             end
         end
