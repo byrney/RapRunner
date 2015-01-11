@@ -18,9 +18,8 @@ module RapRunner
 
         def initialize(config, group, name, server)
             @config = config
-            conmon = Monitor.new(STDOUT, server)  # mute stdout if running as server
-            @monitors = []
-            @monitors << conmon
+            @input_ios = [STDIN]
+            @monitors = [Monitor.new(STDOUT, false)]  # mute stdout in server mode
             if(name)
                 notice( "Starting process [#{name}]")
                 active = config.processes.select{|h| h.name == name}
@@ -36,9 +35,9 @@ module RapRunner
         def run(active, server)
             @processes = exec(active)
             if(server)
-                wait_server(@processes, [STDIN])
+                wait_server(@processes)
             else
-                wait_and_read(@processes, [STDIN])
+                wait_and_read(@processes)
             end
         end
 
@@ -87,31 +86,40 @@ module RapRunner
             loop {
                 client = server.accept()
                 @monitors << Monitor.new(client)
+                @input_ios << client
                 client.write("RapRunner: Connected\n")
             }
         end
 
-        def wait_server(processes, ios)
+        def wait_server(processes)
             port = 2000
             puts("Accepting monitor connections on #{port}")
             server = TCPServer.new("127.0.0.1", port)
             Thread.new { server_accept(server) }
-            wait_and_read(processes, ios)
+            wait_and_read(processes)
         end
 
-        def wait_and_read(processes, input_ios)
+        def wait_and_read(processes)
             process_threads = processes.keys()
             while(process_threads.any? {|t| t.alive?})
-                rs,_,_ = IO.select(input_ios, nil, nil, 5)
-                if(rs)
-                    rs.each do |r|
+                inputs = Array.new(@input_ios)
+                rs,_,es = IO.select(inputs, nil, inputs, 2)
+                rs && rs.each do |r|
+                    begin
                         line = r.readline()
-                        control_command(r, line, processes)
+                    rescue Exception => e
+                        pp e
+                        @input_ios.delete(r)
+                        r.close()
+                        next
                     end
+                    control_command(r, line, processes)
+                end
+                es && es.each do |e|
+                    ps = @input_ios.delete(e)
+                    ps.closed?() || ps.close()
                 end
             end
-        rescue EOFError
-            monitor("Bye")
         end
 
         def control_command(requestio, line, processes)
@@ -122,7 +130,7 @@ module RapRunner
                 respio.write( summary(processes) )
             when "mon"
                 @monitors.each { |m| m.io == respio && m.mute = false }
-            when ""
+            #when ""
 
             else
                 respio.write("Unknown command #{line}");
@@ -149,8 +157,11 @@ module RapRunner
                     m.write(message)
                 rescue Exception, Errno::ECONNRESET => e
                     pp e
+                    #@input_ios.delete(m.ios)
                     client = @monitors.delete(m)
-                    client.close() if client
+                    if(client)
+                        client.closed?() || client.close()
+                    end
                 end
             end
         end

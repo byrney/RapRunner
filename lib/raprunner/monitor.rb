@@ -24,7 +24,11 @@ module RapRunner
         end
 
         def close()
-            @io.close()
+            @io.closed? || @io.close()
+        end
+
+        def closed?()
+            @io.closed?()
         end
     end
 end
