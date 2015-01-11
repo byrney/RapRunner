@@ -20,6 +20,7 @@ module RapRunner
             @config = config
             @input_ios = [STDIN]
             @monitors = [Monitor.new(STDOUT, false)]  # mute stdout in server mode
+            @processes = {}
             if(name)
                 notice( "Starting process [#{name}]")
                 active = config.processes.select{|h| h.name == name}
@@ -42,44 +43,20 @@ module RapRunner
         end
 
         def exec(commands)
-            threads = {}
+            instances = {}
             commands.each do |c|
                 cname = Color.send(c.colour, c.name)
                 notice(("Running [#{c.command}] as [#{cname}]. Notify on #{c.notifies}"))
-                thread,pi = run_background_process(c)
-                raise("Failed to run [#{c.name}] -> #{c.command}") unless thread.alive?
-                threads[thread] = pi
+                pi = run_background_instance(c)
+                raise("Failed to run [#{c.name}] -> #{c.command}") unless pi.alive?
+                instances[c.name] = pi
             end
-            return threads
+            return instances
         end
 
-        def run_background_process(process_config)
+        def run_background_instance(process_config)
             pi = ProcessInstance.new(process_config, @notifiers, self)
-            thread = Thread.new do
-                run_process(pi, process_config)
-            end
-            return thread, pi
-        end
-
-        def run_process(pi, process_config)
-            loop do
-                exit_status = pi.run()
-                pi.restarts += 1
-                restart_time = exit_status == 0 ? 0 : pi.backoff_seconds ** pi.restarts
-                on_process_exit(process_config.name, exit_status, restart_time, pi.restarts, pi.max_restarts)
-                sleep(pi.backoff_seconds ** pi.restarts)
-                r = pi.restarts
-                m = pi.max_restarts
-                if(r < m)
-                    notice("Restart [#{pi.restarts} of #{pi.max_restarts}]: #{process_config.name}")
-                else
-                    notice("Not restarting [#{pi.restarts} of #{pi.max_restarts}]: #{process_config.name}")
-                    break
-                end
-            end
-        rescue Exception => e
-            pp e
-            pp e.backtrace
+            return pi.run_background()
         end
 
         def server_accept(server)
@@ -100,11 +77,11 @@ module RapRunner
         end
 
         def wait_and_read(processes)
-            process_threads = processes.keys()
-            while(process_threads.any? {|t| t.alive?})
+            quit = nil
+            until(quit)
                 inputs = Array.new(@input_ios)
-                rs,_,es = IO.select(inputs, nil, inputs, 2)
-                rs && rs.each do |r|
+                readable,_,errored = IO.select(inputs, nil, inputs, 2)
+                readable && readable.each do |r|
                     begin
                         line = r.readline()
                     rescue Exception => e
@@ -113,16 +90,16 @@ module RapRunner
                         r.close()
                         next
                     end
-                    control_command(r, line, processes)
+                    quit = control_action(r, line, processes)
                 end
-                es && es.each do |e|
+                errored && errored.each do |e|
                     ps = @input_ios.delete(e)
                     ps.closed?() || ps.close()
                 end
             end
         end
 
-        def control_command(requestio, line, processes)
+        def control_action(requestio, line, processes)
             respio = (requestio == STDIN) ? STDOUT : requestio
             @monitors.each { |m| m.io == respio && m.mute = true }
             case line.strip()
@@ -131,10 +108,12 @@ module RapRunner
             when "mon"
                 @monitors.each { |m| m.io == respio && m.mute = false }
             #when ""
-
+            when "shutdown"
+                return true
             else
-                respio.write("Unknown command #{line}");
+                respio.write("Unknown control action #{line}");
             end
+            return nil
         end
 
         def summary(processes)
@@ -142,9 +121,9 @@ module RapRunner
             body << sprintf("%s%s%s", '=' * 30, '  status   ', '=' * 30)
             format = "%-10s%-15s%-20s%-20s%-30s"
             body << sprintf(format, 'pid', 'name', 'status', 'start', 'command')
-            processes.each_pair do |thread, pi|
+            processes.each_pair do |name, pi|
                 st = pi.start_time.strftime("%T") if pi.start_time
-                body << sprintf(format,  pi.pid, pi.name, colour_status(thread), st, pi.command)
+                body << sprintf(format,  pi.pid, pi.name, colour_status(pi.thread), st, pi.command)
             end
             body << sprintf("%s\n", '=' * 70)
             return  body.join("\n");
@@ -170,9 +149,9 @@ module RapRunner
             puts message
             monitor(message)
         end
-        def log(process_name, output)
-            pi = @processes.find { |k,v| v.name == process_name }[1]
-            msg = Color.send(pi.colour, process_name) + ":" + output
+
+        def log(process_name, process_colour, output)
+            msg = Color.send(process_colour, process_name) + ":" + output
             monitor(msg)
         end
 
@@ -195,22 +174,6 @@ module RapRunner
             return notifiers
         end
 
-        def on_process_exit(name, exit_status, restart_time, restart, max_restarts)
-            msg_restart = restart >= max_restarts ? "Will not be restarted" : "Restart in #{restart_time} seconds"
-            if(exit_status == 0)
-                call_notify("Process [#{name}] exited", name, ["Exit:", "#{name} exited. #{msg_restart}"])
-            else
-                call_notify("Process [#{name}] failed", name, ["Fail:", "#{name} failed with status #{exit_status}. #{msg_restart} "])
-            end
-        end
-
-        def call_notify(raw_line, name, matches)
-            return unless @notifiers
-            @notifiers.each_pair do |k, n|
-                n.call(raw_line, name, matches)
-            end
-        end
-
         def error(text)
             Color.red(text)
         end
@@ -227,14 +190,10 @@ module RapRunner
             end
         end
 
-        def all_finished?(threads)
-            running = threads.any? {|t| t.alive? }
-            return !running
-        end
-
     end
 
 end
+
 if __FILE__ == $0
     location = ARGV[0]
     group = ARGV[1]
