@@ -23,18 +23,18 @@ module RapRunner
             @processes = {}
             if(name)
                 notice( "Starting process [#{name}]")
-                active = config.processes.select{|h| h.name == name}
+                active_configs = config.processes.select{|h| h.name == name}
             else
                 notice( "Starting group [#{group}]")
-                active = config.processes.select{|h| h.groups.include?(group)}
+                active_configs = config.processes.select{|h| h.groups.include?(group)}
             end
-            raise("Nothing to run in group [#{group}]") unless active.length > 0
+            raise("Nothing to run in group [#{group}]") unless active_configs.length > 0
             @notifiers = std_notifiers().merge(config.notifiers || {})
-            run(active, server)
+            run(active_configs, server)
         end
 
-        def run(active, server)
-            @processes = exec(active)
+        def run(active_configs, server)
+            @processes = exec(active_configs)
             if(server)
                 wait_server(@processes)
             else
@@ -42,19 +42,19 @@ module RapRunner
             end
         end
 
-        def exec(commands)
+        def exec(active_configs)
             instances = {}
-            commands.each do |c|
+            active_configs.each do |c|
                 cname = Color.send(c.colour, c.name)
                 notice(("Running [#{c.command}] as [#{cname}]. Notify on #{c.notifies}"))
-                pi = run_background_instance(c)
+                pi = create_instance(c)
                 raise("Failed to run [#{c.name}] -> #{c.command}") unless pi.alive?
                 instances[c.name] = pi
             end
             return instances
         end
 
-        def run_background_instance(process_config)
+        def create_instance(process_config)
             pi = ProcessInstance.new(process_config, @notifiers, self)
             return pi.run_background()
         end
@@ -72,8 +72,19 @@ module RapRunner
             port = 2000
             puts("Accepting monitor connections on #{port}")
             server = TCPServer.new("127.0.0.1", port)
-            Thread.new { server_accept(server) }
+            server_thread = Thread.new { server_accept(server) }
             wait_and_read(processes)
+            puts "Shutting down"
+            server_thread.kill()
+            stop_instances(@processes.dup())
+        end
+
+        def stop_instances(instances)
+            return unless instances
+            instances.each_pair do |k, i|
+                puts "stopping #{k}"
+                i.stop()
+            end
         end
 
         def wait_and_read(processes)
@@ -85,7 +96,6 @@ module RapRunner
                     begin
                         line = r.readline()
                     rescue Exception => e
-                        pp e
                         @input_ios.delete(r)
                         r.close()
                         next
@@ -134,8 +144,7 @@ module RapRunner
             current_monitors.each do |m|
                 begin
                     m.write(message)
-                rescue Exception, Errno::ECONNRESET => e
-                    pp e
+                rescue Exception, Errno::ECONNRESET
                     #@input_ios.delete(m.ios)
                     client = @monitors.delete(m)
                     if(client)

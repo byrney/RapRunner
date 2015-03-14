@@ -28,6 +28,22 @@ module RapRunner
             end
         end
 
+        def stop()
+            return unless @thread
+            t = @thread
+            @thread = nil
+            p = @pid
+            @pid = nil
+            puts "sending TERM"
+            Process.kill("TERM", p)
+            puts "sleeping"
+            sleep(2)
+            puts "sending kill"
+            Process.kill("KILL", p)
+            puts "killing thread"
+            t.kill()
+        end
+
         def alive?()
             @thread.alive?()
         end

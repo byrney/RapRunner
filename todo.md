@@ -1,7 +1,9 @@
 
 - [ ] Tidy up the file/class names now that its gemified
 - [ ] Add some stuff to the readme
-- [ ] add remote control interface  (HTTP?)
+- [ ] add remote control interface
+    -[x] TCP
+    -[ ] HTTP
 - [ ] Add restart count to the status messages
 - [x] Github
 - [x] rubygems?
@@ -23,3 +25,6 @@
 - [ ] Show status or process rather than thread  (esp when waiting to restart)
 - [ ] Notifier on windows  ( https://github.com/stereobooster/rb-notifu ? )
 - [x] Make ansi colour work on windows
+- [ ] Allow TCP/Console connections to start/stop/restart managed processes
+- [ ] Make TCP port configurable
+- [ ] Split monitoring connections and controlling connections to diff ports?
